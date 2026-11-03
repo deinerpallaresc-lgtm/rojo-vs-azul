@@ -1,2 +1,506 @@
-<!-- Aplicación Rojo vs Azul -->
-6.
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROJO VS. AZUL</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101827;color:#f8fafc;font-family:Arial,sans-serif}
+header{padding:20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1,h2{text-align:center}
+main{max-width:950px;margin:35px auto;padding:20px}
+.card{background:#1b2940;border:1px solid #35445d;border-radius:16px;padding:24px;margin:15px 0}
+input{display:block;width:100%;padding:14px;margin:12px 0;border-radius:9px;border:1px solid #52627a;background:#101827;color:white;font-size:16px}
+button{border:0;border-radius:10px;padding:13px 18px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:#e8edf5;color:#142039;width:100%}
+.red{background:#e33445;color:white}
+.blue{background:#2563eb;color:white}
+.gray{background:#35445d;color:white}
+.choice{min-height:210px;padding:25px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;border-radius:18px}
+.choice button{width:100%;font-size:20px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.timer{text-align:center;font-size:65px;font-weight:900;margin:15px}
+.muted{color:#aab8cc;line-height:1.5}
+.hidden{display:none!important}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat{background:#25344c;padding:18px;border-radius:12px;text-align:center}
+.stat strong{font-size:28px;display:block;margin-top:8px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
+table{width:100%;border-collapse:collapse;min-width:600px}
+td,th{padding:12px;text-align:left;border-bottom:1px solid #35445d}
+th{color:#aab8cc}
+.tablewrap{overflow-x:auto}
+.notice{padding:15px;background:#26354d;border-radius:10px;margin-top:20px;text-align:center}
+.error{color:#ff8585}
+.success{color:#75e0a0}
+.bar{height:18px;background:#34445c;border-radius:10px;overflow:hidden;display:flex;margin:15px 0}
+.bar span{height:100%}
+@media(max-width:650px){
+ .choices{grid-template-columns:1fr}
+ .stats{grid-template-columns:repeat(2,1fr)}
+ .timer{font-size:48px}
+}
+</style>
+</head>
+<body>
+
+<header>
+ <strong>🔴 ROJO VS. 🔵 AZUL</strong>
+ <div>
+  <button class="gray" onclick="home()">Inicio</button>
+  <button class="gray" onclick="showLogin()">Acceso docente</button>
+ </div>
+</header>
+
+<main id="welcome">
+ <div class="card">
+  <h1>¿TE SALVAS TÚ O SALVAMOS A TODOS?</h1>
+  <p class="muted" style="text-align:center">
+   Registra tu nombre y apellido para participar.
+   Tendrás dos minutos para tomar una decisión.
+  </p>
+  <input id="first" placeholder="Nombre" autocomplete="given-name">
+  <input id="last" placeholder="Apellido" autocomplete="family-name">
+  <button class="primary" onclick="register()">INGRESAR AL DESAFÍO</button>
+  <p id="entryMessage" class="error"></p>
+ </div>
+ <div class="notice">
+  Actividad de simulación educativa. Ninguna elección modifica calificaciones académicas reales.
+ </div>
+</main>
+
+<main id="voting" class="hidden">
+ <div class="card">
+  <h2>RONDA <span id="roundNumber">-</span></h2>
+  <p class="muted" style="text-align:center">TIEMPO RESTANTE</p>
+  <div class="timer" id="timer">02:00</div>
+  <div class="choices">
+   <section class="choice red">
+    <h2>ROJO</h2>
+    <p>Te salvas tú.</p>
+    <p>Si más de la mitad pulsa este botón, todos los que pulsaron AZUL pierden la materia.</p>
+    <button onclick="vote('ROJO')">ELEGIR ROJO</button>
+   </section>
+   <section class="choice blue">
+    <h2>AZUL</h2>
+    <p>Salvas a todos.</p>
+    <p>Si más de la mitad pulsa este botón, nadie pierde la materia.</p>
+    <button onclick="vote('AZUL')">ELEGIR AZUL</button>
+   </section>
+  </div>
+  <p id="voteMessage" class="muted"></p>
+ </div>
+</main>
+
+<main id="finished" class="hidden">
+ <div class="card">
+  <h1>✓ PARTICIPACIÓN REGISTRADA</h1>
+  <h2 id="finalChoice"></h2>
+  <p class="muted" style="text-align:center">Tu decisión ha sido registrada. No puedes modificarla.</p>
+ </div>
+</main>
+
+<main id="login" class="hidden">
+ <div class="card">
+  <h1>ACCESO DOCENTE</h1>
+  <input id="email" type="email" placeholder="Correo electrónico">
+  <input id="password" type="password" placeholder="Contraseña">
+  <button class="primary" onclick="login()">INICIAR SESIÓN</button>
+  <button class="gray" onclick="home()">Volver</button>
+  <p id="loginMessage" class="error"></p>
+ </div>
+</main>
+
+<main id="dashboard" class="hidden">
+ <div class="card">
+  <h1>PANEL DOCENTE</h1>
+  <p id="roundInfo" class="muted" style="text-align:center"></p>
+  <div class="tabs">
+   <button class="gray" onclick="refreshDashboard()">Actualizar</button>
+   <button class="gray" onclick="createRound()">Nueva ronda</button>
+   <button class="red" onclick="closeRound()">Cerrar ronda</button>
+   <button class="blue" onclick="exportCSV()">Exportar CSV</button>
+   <button class="gray" onclick="logout()">Cerrar sesión</button>
+  </div>
+ </div>
+
+ <section class="stats">
+  <div class="stat">PARTICIPANTES<strong id="total">0</strong></div>
+  <div class="stat">ROJO<strong id="redCount">0</strong></div>
+  <div class="stat">AZUL<strong id="blueCount">0</strong></div>
+  <div class="stat">NO VOTO<strong id="noCount">0</strong></div>
+ </section>
+
+ <div class="card">
+  <h2>RESULTADOS</h2>
+  <div class="bar">
+   <span id="redBar" style="background:#e33445;width:0"></span>
+   <span id="blueBar" style="background:#2563eb;width:0"></span>
+   <span id="noBar" style="background:#8491a5;width:0"></span>
+  </div>
+  <p id="result" style="text-align:center;font-weight:bold"></p>
+  <p id="percentages" class="muted" style="text-align:center"></p>
+ </div>
+
+ <div class="card">
+  <h2>PARTICIPANTES</h2>
+  <input id="search" placeholder="Buscar participante..." oninput="renderParticipants()">
+  <select id="filter" onchange="renderParticipants()" style="padding:12px;width:100%">
+   <option value="TODOS">Todas las elecciones</option>
+   <option value="ROJO">ROJO</option>
+   <option value="AZUL">AZUL</option>
+   <option value="NO VOTO">NO VOTO</option>
+   <option value="PENDIENTE">PENDIENTE</option>
+  </select>
+  <div class="tablewrap">
+   <table>
+    <thead>
+     <tr>
+      <th>N.º</th><th>Nombre</th><th>Elección</th>
+      <th>Tiempo de decisión</th><th>Fecha</th>
+     </tr>
+    </thead>
+    <tbody id="participants"></tbody>
+   </table>
+  </div>
+ </div>
+
+ <div class="card">
+  <h2>HISTORIAL DE RONDAS</h2>
+  <div id="history"></div>
+ </div>
+ <p id="adminMessage" class="muted"></p>
+</main>
+
+<script>
+const SUPABASE_URL = 'https://jifsmpvkiquizgidpxbs.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_gmMc9zm6mjov63kwUI470A_XKsG5aKW';
+
+const db = window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let sessionToken = null;
+let deadline = null;
+let timerInterval = null;
+let dashboardData = null;
+let refreshInterval = null;
+let votingBusy = false;
+
+const screens = ['welcome','voting','finished','login','dashboard'];
+
+function show(id){
+ screens.forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+}
+
+function home(){
+ clearInterval(timerInterval);
+ show('welcome');
+}
+
+function showLogin(){
+ show('login');
+}
+
+function errorMessage(error){
+ return error?.message || 'Ocurrió un error. Intenta nuevamente.';
+}
+
+async function register(){
+ const first=document.getElementById('first').value.trim();
+ const last=document.getElementById('last').value.trim();
+ const msg=document.getElementById('entryMessage');
+
+ msg.textContent='';
+
+ if(!first || !last){
+  msg.textContent='Escribe tu nombre y apellido.';
+  return;
+ }
+
+ const {data,error}=await db.rpc('register_participant',{
+  p_first_name:first,
+  p_last_name:last
+ });
+
+ if(error){
+  msg.textContent=errorMessage(error);
+  return;
+ }
+
+ const participant=data[0];
+
+ sessionToken=participant.access_token;
+ deadline=new Date(participant.deadline_at).getTime();
+
+ sessionStorage.setItem('rojo_token',sessionToken);
+ sessionStorage.setItem('rojo_deadline',String(deadline));
+
+ document.getElementById('roundNumber').textContent='Activa';
+ document.getElementById('voteMessage').textContent='';
+ show('voting');
+ startTimer();
+}
+
+function startTimer(){
+ clearInterval(timerInterval);
+ updateTimer();
+ timerInterval=setInterval(updateTimer,250);
+}
+
+function updateTimer(){
+ if(!deadline)return;
+
+ const remaining=Math.max(0,deadline-Date.now());
+ const seconds=Math.ceil(remaining/1000);
+
+ document.getElementById('timer').textContent=
+  String(Math.floor(seconds/60)).padStart(2,'0')+':'+
+  String(seconds%60).padStart(2,'0');
+
+ if(remaining<=0){
+  clearInterval(timerInterval);
+  vote('ROJO',true);
+ }
+}
+
+async function vote(choice,automatic=false){
+ if(!sessionToken || votingBusy)return;
+ votingBusy=true;
+
+ const msg=document.getElementById('voteMessage');
+ msg.textContent='Registrando tu decisión...';
+
+ const {data,error}=await db.rpc('cast_vote',{
+  p_access_token:sessionToken,
+  p_choice:choice
+ });
+
+ if(error){
+  votingBusy=false;
+  msg.textContent=errorMessage(error);
+  return;
+ }
+
+ const result=data[0]?.recorded_choice || choice;
+
+ clearInterval(timerInterval);
+ sessionToken=null;
+ deadline=null;
+
+ sessionStorage.removeItem('rojo_token');
+ sessionStorage.removeItem('rojo_deadline');
+
+ document.getElementById('finalChoice').textContent=
+  result==='NO VOTO'?'RESULTADO: NO VOTO':'TU ELECCIÓN: '+result;
+
+ show('finished');
+ votingBusy=false;
+}
+
+async function login(){
+ const email=document.getElementById('email').value.trim();
+ const password=document.getElementById('password').value;
+ const msg=document.getElementById('loginMessage');
+
+ msg.textContent='';
+
+ const {error}=await db.auth.signInWithPassword({email,password});
+
+ if(error){
+  msg.textContent=errorMessage(error);
+  return;
+ }
+
+ await refreshDashboard();
+}
+
+async function logout(){
+ clearInterval(refreshInterval);
+ await db.auth.signOut();
+ dashboardData=null;
+ show('welcome');
+}
+
+async function refreshDashboard(){
+ const msg=document.getElementById('adminMessage');
+ msg.textContent='Actualizando información...';
+
+ const {data,error}=await db.rpc('get_admin_dashboard');
+
+ if(error){
+  msg.textContent=errorMessage(error);
+  return;
+ }
+
+ dashboardData=data;
+ renderDashboard();
+ msg.textContent='Información actualizada.';
+ show('dashboard');
+
+ clearInterval(refreshInterval);
+ refreshInterval=setInterval(refreshDashboard,5000);
+}
+
+function renderDashboard(){
+ const active=dashboardData.active_round;
+ const history=dashboardData.history || [];
+
+ if(!active){
+  document.getElementById('roundInfo').textContent='No hay una ronda activa.';
+  document.getElementById('total').textContent='0';
+  document.getElementById('redCount').textContent='0';
+  document.getElementById('blueCount').textContent='0';
+  document.getElementById('noCount').textContent='0';
+  document.getElementById('participants').innerHTML='';
+  document.getElementById('result').textContent='Sin ronda activa';
+  document.getElementById('history').innerHTML=history.map(h=>
+   `<p>Ronda ${h.round_number} · ${h.result} · ${h.total} participantes</p>`
+  ).join('') || 'Sin historial.';
+  return;
+ }
+
+ const red=Number(active.red)||0;
+ const blue=Number(active.blue)||0;
+ const no=Number(active.no_vote)||0;
+ const total=Number(active.total)||0;
+ const valid=red+blue;
+
+ document.getElementById('roundInfo').textContent=
+  `Ronda ${active.round_number} · En curso`;
+
+ document.getElementById('total').textContent=total;
+ document.getElementById('redCount').textContent=red;
+ document.getElementById('blueCount').textContent=blue;
+ document.getElementById('noCount').textContent=no;
+
+ const denominator=total||1;
+
+ document.getElementById('redBar').style.width=(red/denominator*100)+'%';
+ document.getElementById('blueBar').style.width=(blue/denominator*100)+'%';
+ document.getElementById('noBar').style.width=(no/denominator*100)+'%';
+
+ let result='Ronda en curso';
+
+ if(valid===0)result='SIN MAYORÍA';
+ else if(red===blue)result='EMPATE: SIN MAYORÍA';
+ else if(red>valid/2)result='MAYORÍA ROJA';
+ else if(blue>valid/2)result='MAYORÍA AZUL';
+
+ document.getElementById('result').textContent=result;
+
+ document.getElementById('percentages').textContent=
+  `Votos válidos: ${valid} · ROJO: ${valid? (red/valid*100).toFixed(1):0}% · AZUL: ${valid?(blue/valid*100).toFixed(1):0}%`;
+
+ renderParticipants();
+
+ document.getElementById('history').innerHTML=history.map(h=>
+  `<p>Ronda ${h.round_number} · ${h.result} · ${h.total} participantes · ROJO ${h.red} · AZUL ${h.blue} · NO VOTO ${h.no_vote}</p>`
+ ).join('') || 'Todavía no hay rondas cerradas.';
+}
+
+function renderParticipants(){
+ if(!dashboardData?.active_round)return;
+
+ const participants=dashboardData.active_round.participants||[];
+ const query=document.getElementById('search').value.toLowerCase();
+ const filter=document.getElementById('filter').value;
+
+ const filtered=participants.filter(p=>{
+  const name=(p.first_name+' '+p.last_name).toLowerCase();
+  return name.includes(query) && (filter==='TODOS'||p.choice===filter);
+ });
+
+ document.getElementById('participants').innerHTML=filtered.map((p,i)=>{
+  const seconds=Number(p.decision_seconds)||0;
+  const time=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
+  const date=p.registered_at?new Date(p.registered_at).toLocaleString('es-CO'):'—';
+
+  return `<tr>
+   <td>${i+1}</td>
+   <td>${escapeHTML(p.first_name+' '+p.last_name)}</td>
+   <td>${escapeHTML(p.choice)}</td>
+   <td>${time}</td>
+   <td>${date}</td>
+  </tr>`;
+ }).join('');
+}
+
+function escapeHTML(value){
+ return String(value).replace(/[&<>"']/g,c=>({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+ }[c]));
+}
+
+async function createRound(){
+ if(!confirm('¿Deseas iniciar una nueva ronda?'))return;
+
+ const {error}=await db.rpc('create_round');
+
+ if(error){
+  document.getElementById('adminMessage').textContent=errorMessage(error);
+  return;
+ }
+
+ await refreshDashboard();
+}
+
+async function closeRound(){
+ if(!confirm('¿Deseas cerrar la ronda? Los participantes pendientes quedarán como NO VOTO.'))return;
+
+ const {error}=await db.rpc('close_round');
+
+ if(error){
+  document.getElementById('adminMessage').textContent=errorMessage(error);
+  return;
+ }
+
+ await refreshDashboard();
+}
+
+function exportCSV(){
+ if(!dashboardData)return;
+
+ const rows=dashboardData.active_round?.participants||[];
+
+ const data=[
+  ['Nombre','Apellido','Elección','Tiempo de decisión','Fecha de registro'],
+  ...rows.map(p=>[
+   p.first_name,
+   p.last_name,
+   p.choice,
+   p.decision_seconds,
+   p.registered_at
+  ])
+ ];
+
+ const csv='\ufeff'+data.map(row=>
+  row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')
+ ).join('\r\n');
+
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ a.href=url;
+ a.download='resultados_rojo_vs_azul.csv';
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+// Recuperar una sesión de votación si se recarga la página.
+window.addEventListener('load',async()=>{
+ const token=sessionStorage.getItem('rojo_token');
+ const savedDeadline=Number(sessionStorage.getItem('rojo_deadline'));
+
+ if(token && savedDeadline){
+  sessionToken=token;
+  deadline=savedDeadline;
+  show('voting');
+  startTimer();
+ }
+});
+</script>
+</body>
+</html>
