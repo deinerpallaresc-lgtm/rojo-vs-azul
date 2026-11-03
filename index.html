@@ -172,6 +172,7 @@ th{color:#aab8cc}
  <div class="card">
   <h2>HISTORIAL DE RONDAS</h2>
   <div id="history"></div>
+  <div id="historyDetails"></div>
  </div>
  <p id="adminMessage" class="muted"></p>
 </main>
@@ -357,8 +358,13 @@ function renderDashboard(){
   document.getElementById('participants').innerHTML='';
   document.getElementById('result').textContent='Sin ronda activa';
   document.getElementById('history').innerHTML=history.map(h=>
-   `<p>Ronda ${h.round_number} · ${h.result} · ${h.total} participantes</p>`
-  ).join('') || 'Sin historial.';
+  `<div style="padding:12px 0;border-bottom:1px solid #ddd">
+    <p>Ronda ${h.round_number} · ${h.result} · ${h.total} participantes</p>
+    <button class="small" onclick="viewRoundParticipants('${h.id}')">
+      VER PARTICIPANTES
+    </button>
+  </div>`
+).join('') || 'Sin historial.';
   return;
  }
 
@@ -427,7 +433,62 @@ function renderParticipants(){
   </tr>`;
  }).join('');
 }
+async function viewRoundParticipants(roundId){
+ const details=document.getElementById('historyDetails');
 
+ details.innerHTML='Consultando participantes...';
+
+ const {data,error}=await db.rpc('get_round_participants',{
+  p_round_id:roundId
+ });
+
+ if(error){
+  details.textContent='Error al consultar: '+errorMessage(error);
+  return;
+ }
+
+ if(!data || data.length===0){
+  details.textContent='Esta ronda no tiene participantes registrados.';
+  return;
+ }
+
+ const rows=data.map((p,i)=>{
+  const seconds=Number(p.decision_seconds)||0;
+  const time=p.cast_at
+   ? String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0')
+   : '—';
+
+  const date=p.registered_at
+   ? new Date(p.registered_at).toLocaleString('es-CO')
+   : '—';
+
+  return `<tr>
+   <td>${i+1}</td>
+   <td>${escapeHTML(p.first_name+' '+p.last_name)}</td>
+   <td>${escapeHTML(p.choice)}</td>
+   <td>${time}</td>
+   <td>${date}</td>
+  </tr>`;
+ }).join('');
+
+ details.innerHTML=`
+  <h3>Participantes de la ronda seleccionada</h3>
+  <div class="tablewrap">
+   <table>
+    <thead>
+     <tr>
+      <th>N.º</th>
+      <th>Nombre</th>
+      <th>Elección</th>
+      <th>Tiempo de decisión</th>
+      <th>Fecha de registro</th>
+     </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+   </table>
+  </div>
+ `;
+}
 function escapeHTML(value){
  return String(value).replace(/[&<>"']/g,c=>({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
